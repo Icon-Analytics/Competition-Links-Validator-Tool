@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Competition Link Validator Tool</title>
+  <link rel="shortcut icon" href="images/IVYlogo.png" type="image/x-icon">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #121212;
+      color: #f1f1f1;
+      padding: 40px;
+    }
+    .card {
+      background-color: #1e1e1e;
+      color: #f1f1f1;
+    }
+    .btn {
+      margin-top: 10px;
+    }
+    ul {
+      list-style-type: none;
+      padding-left: 0;
+    }
+    li {
+      margin: 5px 0;
+      color: #f87171;
+    }
+    a {
+      color: #0d6efd;
+    }
+    .logo {
+      height: 40px;
+      margin-right: 10px;
+    }
+    .format-box {
+      background-color: #2b2b2b;
+      border-left: 4px solid #0d6efd;
+      padding: 10px;
+      margin-bottom: 15px;
+    }
+    .format-box code {
+      color: #7dd3fc;
+    }
+    .result-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    }
+    .copyright {
+      text-align: center;
+      margin-top: 30px;
+      color: #888;
+    }
+    /* NEW: Progress bar styling */
+    #progressContainer {
+      display: none;
+      margin-top: 20px;
+    }
+    .progress {
+      height: 25px;
+      background-color: #2b2b2b;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      background-color: #0d6efd;
+      transition: width 0.3s ease-in-out;
+      animation: progressAnimation 2s infinite;
+    }
+    @keyframes progressAnimation {
+      0% { opacity: 1; }
+      50% { opacity: 0.7; }
+      100% { opacity: 1; }
+    }
+    #progressText {
+      margin-bottom: 10px;
+      font-weight: bold;
+      color: #f1f1f1;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="card p-4">
+      <div class="d-flex align-items-center mb-3">
+        <img src="images/IVYlogo.png" alt="Company Logo" class="logo">
+        <h2>Competition Link Validator Tool</h2>
+      </div>
+      <p>Select an Excel or CSV file with <strong>[YT Link]</strong>, <strong>[JioSaavn Link]</strong> and <strong>[Spotify Link]</strong> columns. Column names are case-sensitive.</p>
+      <p style="color:red;">
+        <strong>Note:</strong>- If any link is not applicable, type 'NA'. Do not leave it blank or enter any other value.<br>
+      </p>
+
+      <div class="format-box">
+        <p class="mb-1"><strong>✅ Acceptable Link Formats:</strong></p>
+        <ul class="mb-0">
+          <li><strong>YouTube:</strong> <code>https://www.youtube.com/watch?v=VIDEO_ID</code></li>
+          <li><strong>JioSaavn:</strong> <code>https://www.jiosaavn.com/song/song-title/SONG_ID</code></li>
+          <li><strong>Spotify:</strong> <code>https://open.spotify.com/track/TRACK_ID</code></li>
+        </ul>
+      </div>
+
+      <input class="form-control mb-3" type="file" id="fileInput" accept=".xlsx,.csv">
+      <button class="btn btn-primary" id="validateBtn" onclick="handleUpload()">Validate Links</button>
+
+      <!-- NEW: Progress bar HTML -->
+      <div id="progressContainer">
+        <div id="progressText">Processing file, please wait...</div>
+        <div class="progress">
+          <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%;" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100"></div>
+        </div>
+      </div>
+
+      <div class="result-actions mt-3" id="actionButtons" style="display:none;">
+        <button class="btn btn-success" id="downloadBtn">📥 Download Report</button>
+        <button class="btn btn-secondary" onclick="window.location.reload()">🔁 Validate Another File</button>
+      </div>
+      <div id="results" class="mt-4"></div>
+    </div>
+  </div>
+
+  <!-- 🔔 Missing Columns Modal -->
+  <div class="modal fade" id="missingColumnsModal" tabindex="-1" aria-labelledby="missingColumnsLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-light">
+        <div class="modal-header">
+          <h5 class="modal-title" id="missingColumnsLabel">Missing Required Columns</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="missingColumnsBody"></div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
+            <a href="index.html" style="text-decoration: none; color: inherit;">Close</a>
+          </button>          
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 🔔 Invalid File Modal -->
+  <div class="modal fade" id="invalidFileModal" tabindex="-1" aria-labelledby="invalidFileLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content bg-dark text-light">
+        <div class="modal-header">
+          <h5 class="modal-title" id="invalidFileLabel">Invalid File</h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p>Please upload a valid Excel (.xlsx) or CSV (.csv) file.</p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+  <script>
+    function validateYouTube(url) {
+      return /^https:\/\/www\.youtube\.com\/watch\?v=[\w-]{11}$/.test(url);
+    }
+  
+    function validateSpotify(url) {
+      return /^https:\/\/open\.spotify\.com\/track\/[\w-]{22}$/.test(url);
+    }
+  
+    function validateJioSaavn(url) {
+      return /^https:\/\/www\.jiosaavn\.com\/song\/[^/]+\/[\w-]+$/.test(url);
+    }
+  
+    function formatDateTime() {
+      const now = new Date();
+      const date = now.toISOString().split('T')[0];
+      const time = now.toTimeString().split(' ')[0].replace(/:/g, '-');
+      return `${date}_${time}`;
+    }
+  
+    function handleUpload() {
+      const fileInput = document.getElementById('fileInput');
+      const resultsDiv = document.getElementById('results');
+      const validateBtn = document.getElementById('validateBtn');
+      const progressContainer = document.getElementById('progressContainer');
+      
+      // NEW: Show progress bar and disable validate button
+      resultsDiv.innerHTML = '';
+      document.getElementById('actionButtons').style.display = 'none';
+      progressContainer.style.display = 'block';
+      validateBtn.disabled = true;
+  
+      const file = fileInput.files[0];
+      if (!file) {
+        // NEW: Hide progress bar on error
+        progressContainer.style.display = 'none';
+        validateBtn.disabled = false;
+        new bootstrap.Modal(document.getElementById('invalidFileModal')).show();
+        return;
+      }
+  
+      if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.csv')) {
+        // NEW: Hide progress bar on error
+        progressContainer.style.display = 'none';
+        validateBtn.disabled = false;
+        new bootstrap.Modal(document.getElementById('invalidFileModal')).show();
+        return;
+      }
+  
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        let jsonDataBySheet = {};
+        let workbook;
+  
+        if (file.name.endsWith('.csv')) {
+          const csv = e.target.result;
+          workbook = XLSX.read(csv, { type: 'binary' });
+          const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+          jsonDataBySheet[workbook.SheetNames[0]] = XLSX.utils.sheet_to_json(worksheet);
+        } else {
+          const data = new Uint8Array(e.target.result);
+          workbook = XLSX.read(data, { type: 'array' });
+          workbook.SheetNames.forEach(sheetName => {
+            const worksheet = workbook.Sheets[sheetName];
+            jsonDataBySheet[sheetName] = XLSX.utils.sheet_to_json(worksheet);
+          });
+        }
+  
+        const requiredColumns = ['YT Link', 'JioSaavn Link', 'Spotify Link'];
+        let invalidLinksBySheet = {};
+        let missingColumnsBySheet = {};
+        let validSheets = [];
+        let totalInvalid = 0;
+  
+        // Process each sheet
+        for (const sheetName in jsonDataBySheet) {
+          let jsonData = jsonDataBySheet[sheetName];
+          if (!jsonData || jsonData.length === 0) {
+            missingColumnsBySheet[sheetName] = ['No data found in sheet'];
+            continue;
+          }
+  
+          // Collect all unique column names across all rows
+          const allColumns = new Set();
+          jsonData.forEach(row => {
+            Object.keys(row).forEach(col => allColumns.add(col));
+          });
+  
+          const actualColumns = Array.from(allColumns);
+          const missingColumns = requiredColumns.filter(col => !actualColumns.includes(col));
+  
+          if (missingColumns.length > 0) {
+            missingColumnsBySheet[sheetName] = missingColumns;
+            continue;
+          }
+  
+          // Substitute missing values in the first row with 'NA'
+          if (jsonData[0]) {
+            requiredColumns.forEach(col => {
+              if (!jsonData[0][col] || jsonData[0][col].trim() === '') {
+                jsonData[0][col] = 'NA';
+              }
+            });
+          }
+  
+          // Ensure all rows have required columns, substitute missing with 'NA'
+          jsonData = jsonData.map(row => {
+            const newRow = { ...row };
+            requiredColumns.forEach(col => {
+              if (!newRow[col] || newRow[col].trim() === '') {
+                newRow[col] = 'NA';
+              }
+            });
+            return newRow;
+          });
+  
+          const invalidLinks = {
+            'YouTube Links': [],
+            'Spotify Links': [],
+            'JioSaavn Links': []
+          };
+  
+          jsonData.forEach((row, index) => {
+            const yt = row['YT Link']?.trim();
+            const sp = row['Spotify Link']?.trim();
+            const jio = row['JioSaavn Link']?.trim();
+  
+            if (yt && yt.toUpperCase() !== 'NA' && !validateYouTube(yt)) {
+              invalidLinks['YouTube Links'].push({ Row: index + 2, Link: yt });
+            }
+            if (sp && sp.toUpperCase() !== 'NA' && !validateSpotify(sp)) {
+              invalidLinks['Spotify Links'].push({ Row: index + 2, Link: sp });
+            }
+            if (jio && jio.toUpperCase() !== 'NA' && !validateJioSaavn(jio)) {
+              invalidLinks['JioSaavn Links'].push({ Row: index + 2, Link: jio });
+            }
+          });
+  
+          invalidLinksBySheet[sheetName] = invalidLinks;
+          const sheetInvalidCount = Object.values(invalidLinks).reduce((sum, links) => sum + links.length, 0);
+          totalInvalid += sheetInvalidCount;
+  
+          if (sheetInvalidCount === 0) {
+            validSheets.push(sheetName);
+          }
+        }
+  
+        // Display missing columns modal if any
+        if (Object.keys(missingColumnsBySheet).length > 0) {
+          const body = document.getElementById('missingColumnsBody');
+          let modalContent = '<p>The following sheets have missing required column(s) or no data:</p>';
+          for (const [sheetName, columns] of Object.entries(missingColumnsBySheet)) {
+            modalContent += `<p><strong>Sheet: ${sheetName}</strong></p><ul>${columns.map(col => `<li>${col}</li>`).join('')}</ul>`;
+          }
+          modalContent += '<p>* Use the column names [YT Link, JioSaavn Link, Spotify Link] only</p>';
+          body.innerHTML = modalContent;
+          new bootstrap.Modal(document.getElementById('missingColumnsModal')).show();
+        }
+  
+        // Display results
+        let htmlOutput = '';
+        let hasValidData = false;
+  
+        // Display invalid links
+        if (totalInvalid > 0) {
+          htmlOutput += '<h5>Unacceptable Links Found:</h5>';
+          for (const [sheetName, invalidLinks] of Object.entries(invalidLinksBySheet)) {
+            let sheetOutput = `<h6>Sheet: ${sheetName}</h6>`;
+            let sheetHasInvalid = false;
+  
+            for (const [type, links] of Object.entries(invalidLinks)) {
+              if (links.length > 0) {
+                sheetHasInvalid = true;
+                sheetOutput += `<p><strong>${type}:</strong></p><ul>${links.map(item => `<li>Row ${item.Row}: <a href="${item.Link}" target="_blank">${item.Link}</a></li>`).join('')}</ul>`;
+              }
+            }
+  
+            if (sheetHasInvalid) {
+              htmlOutput += sheetOutput;
+              hasValidData = true;
+            }
+          }
+        }
+  
+        // Display valid sheets
+        if (validSheets.length > 0) {
+          htmlOutput += '<h5>Acceptable Sheets:</h5>';
+          validSheets.forEach(sheetName => {
+            htmlOutput += `<h6>Sheet: ${sheetName}</h6><p>✅ Congrats! There is no unaccepeted links in this sheet!</p>`;
+          });
+          hasValidData = true;
+        }
+  
+        if (totalInvalid === 0 && validSheets.length > 0 && Object.keys(missingColumnsBySheet).length === 0) {
+          resultsDiv.innerHTML = '<div class="alert alert-success">🎉 Congrats! All the links are accepted! ✅</div>';
+        } else if (hasValidData) {
+          resultsDiv.innerHTML = htmlOutput;
+          document.getElementById('actionButtons').style.display = 'flex';
+        }
+  
+        // NEW: Hide progress bar and re-enable validate button
+        progressContainer.style.display = 'none';
+        validateBtn.disabled = false;
+  
+        // Download report
+        document.getElementById('downloadBtn').onclick = function () {
+          const workbook = XLSX.utils.book_new();
+  
+          // Add invalid links sheets
+          for (const [sheetName, invalidLinks] of Object.entries(invalidLinksBySheet)) {
+            const rowsMap = {};
+
+            for (const [type, links] of Object.entries(invalidLinks)) {
+              links.forEach(({ Row, Link }) => {
+                if (!rowsMap[Row]) {
+                  rowsMap[Row] = { row: Row, youtube: '', spotify: '', jiosaavn: '' };
+                }
+                if (type === 'YouTube Links') rowsMap[Row].youtube = Link;
+                else if (type === 'Spotify Links') rowsMap[Row].spotify = Link;
+                else if (type === 'JioSaavn Links') rowsMap[Row].jiosaavn = Link;
+              });
+            }
+
+            // ✅ This is the only 'rows' declaration you need
+            const rows = Object.values(rowsMap).map(row => ({
+              'Row Num': row.row,
+              'YT Link': row.youtube,
+              'JioSaavn Link': row.jiosaavn,
+              'Spotify Link': row.spotify
+            }));
+
+            if (rows.length > 0) {
+              const worksheet = XLSX.utils.json_to_sheet(rows);
+              let outputSheetName = `${sheetName}_Unacceptable`.slice(0, 31);
+              let suffix = 1;
+              while (workbook.SheetNames.includes(outputSheetName)) {
+                outputSheetName = `${sheetName.slice(0, 28 - String(suffix).length)}_I${suffix}`.slice(0, 31);
+                suffix++;
+              }
+              XLSX.utils.book_append_sheet(workbook, worksheet, outputSheetName);
+            }
+          }
+
+  
+          // Add valid sheets
+          validSheets.forEach(sheetName => {
+            const validData = [{ Status: 'Congrats! There is no unaccepted links in this sheet!' }];
+            const worksheet = XLSX.utils.json_to_sheet(validData);
+            let outputSheetName = `${sheetName}_Acceptable`.slice(0, 31);
+            let suffix = 1;
+            while (workbook.SheetNames.includes(outputSheetName)) {
+              outputSheetName = `${sheetName.slice(0, 28 - String(suffix).length)}_V${suffix}`.slice(0, 31);
+              suffix++;
+            }
+            XLSX.utils.book_append_sheet(workbook, worksheet, outputSheetName);
+          });
+  
+          // Write the file
+          if (workbook.SheetNames.length > 0) {
+            XLSX.writeFile(workbook, `Links_Report_${formatDateTime()}.xlsx`);
+          } else {
+            alert("No data to include in the report.");
+          }
+        };
+      };
+  
+      if (file.name.endsWith('.csv')) {
+        reader.readAsBinaryString(file);
+      } else {
+        reader.readAsArrayBuffer(file);
+      }
+    }
+  </script>
+</body>
+</html>
